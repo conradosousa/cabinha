@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cabinha e a Trilha do Respeito</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F4E4C1;
+    --dark:#3D2411;
+    --brown:#8B5A2B;
+    --terracotta:#C67C3E;
+    --sky:#7EC8E3;
+    --gold:#E8B84B;
+    --danger:#A63A2D;
+    --green:#4F7942;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--dark);
+    font-family:'Nunito',sans-serif;
+    touch-action:none;
+    user-select:none;
+  }
+  #gameWrap{
+    position:relative; width:100vw; height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(180deg, var(--dark), #1b120a);
+  }
+  canvas{
+    background:var(--sky);
+    image-rendering:pixelated;
+    max-width:100vw; max-height:100vh;
+    box-shadow: 0 0 0 4px var(--dark), 0 0 40px rgba(0,0,0,.6);
+  }
+  .pixel{ font-family:'Press Start 2P', monospace; }
+
+  /* HUD */
+  #hud{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:10px 14px; pointer-events:none; z-index:5;
+  }
+  .hudBox{
+    background:rgba(61,36,17,.85); color:var(--cream);
+    border:2px solid var(--gold); border-radius:8px;
+    padding:6px 10px; font-size:11px; line-height:1.6;
+  }
+  #bossBarWrap{
+    position:absolute; top:8px; left:50%; transform:translateX(-50%);
+    width:min(60%,420px); z-index:5; display:none;
+  }
+  #bossName{ text-align:center; color:var(--cream); font-size:10px; margin-bottom:4px; text-shadow:2px 2px var(--dark);}
+  #bossBarOuter{ background:rgba(0,0,0,.5); border:2px solid var(--cream); border-radius:6px; height:14px; overflow:hidden;}
+  #bossBarInner{ background:var(--danger); height:100%; width:100%; transition:width .2s; }
+
+  /* Overlays */
+  .overlay{
+    position:absolute; inset:0; z-index:20;
+    background:rgba(20,12,6,.92);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; color:var(--cream); padding:20px; gap:16px;
+  }
+  .hidden{ display:none !important; }
+  .overlay h1{ font-size:clamp(16px,4vw,28px); color:var(--gold); text-shadow:3px 3px var(--dark); margin:0;}
+  .overlay h2{ font-size:clamp(13px,3vw,18px); color:var(--terracotta); margin:0; }
+  .overlay p{ max-width:560px; font-size:clamp(14px,2.4vw,18px); line-height:1.6; font-weight:700; }
+  .btn{
+    font-family:'Press Start 2P',monospace;
+    background:var(--terracotta); color:var(--dark);
+    border:3px solid var(--dark); border-radius:8px;
+    padding:12px 20px; font-size:12px; cursor:pointer;
+    box-shadow:0 4px 0 var(--dark);
+    transition:transform .05s;
+  }
+  .btn:active{ transform:translateY(4px); box-shadow:none; }
+  .btn.secondary{ background:var(--cream); }
+  .badge{
+    display:inline-block; background:var(--green); color:var(--cream);
+    border-radius:20px; padding:8px 16px; font-weight:800; font-size:14px;
+  }
+
+  /* Touch controls */
+  #touchControls{
+    position:absolute; inset:0; z-index:8; pointer-events:none;
+  }
+  #touchControls.active{ pointer-events:auto; }
+
+  /* generic touch button */
+  .tbtn{
+    position:absolute; pointer-events:auto;
+    width:64px; height:64px; border-radius:50%;
+    background:rgba(244,228,193,.18); border:3px solid rgba(244,228,193,.45);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--cream); font-size:26px; font-weight:900;
+    user-select:none; box-shadow:0 6px 0 rgba(0,0,0,.35);
+  }
+  .tbtn:active{ transform:translateY(4px); box-shadow:none; }
+
+  /* D-pad (left) */
+  #dpad{ position:absolute; left:18px; bottom:18px; width:160px; height:160px; }
+  #dpad .tbtn{ width:56px; height:56px; border-radius:10px; font-size:22px; }
+  #btnLeft{ left:8px; bottom:52px; }
+  #btnRight{ left:96px; bottom:52px; }
+  #btnUp{ left:52px; bottom:106px; }
+  #btnDown{ left:52px; bottom: -2px; }
+
+  /* Face buttons (PlayStation style, right) */
+  #face{ position:absolute; right:18px; bottom:18px; width:160px; height:160px; }
+  #face .tbtn{ width:70px; height:70px; border-radius:50%; font-size:28px; }
+  #btnJump{ left:50%; transform:translateX(-50%); top:6px; background:rgba(118,159,255,.95); border-color:#2f4ea8; }
+  #btnAction{ right:6px; top:50%; transform:translateY(-50%); background:rgba(255,110,130,.95); border-color:#8b2b3b; }
+  #btnCross{ left:50%; transform:translateX(-50%); bottom:6px; background:rgba(120,230,170,.95); border-color:#2b7a4f; }
+  #btnSquare{ left:6px; top:50%; transform:translateY(-50%); background:rgba(200,200,200,.95); border-color:#555; }
+
+  #startHint{ font-size:11px; opacity:.8; }
+  @media (max-width:700px){
+    .hudBox{ font-size:9px; }
+  }
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <div id="hud">
+    <div class="hudBox" id="hudLeft">FASE <span id="stageNum">1</span>/4</div>
+    <div class="hudBox" id="hudRight">💛 <span id="heartCount">0</span></div>
+  </div>
+
+  <div id="bossBarWrap">
+    <div id="bossName" class="pixel">CHEFÃO</div>
+    <div id="bossBarOuter"><div id="bossBarInner"></div></div>
+  </div>
+
+  <!-- Touch controls (D-pad left, PlayStation face buttons right) -->
+  <div id="touchControls">
+    <div id="dpad">
+      <div class="tbtn" id="btnUp">▲</div>
+      <div class="tbtn" id="btnLeft">◀</div>
+      <div class="tbtn" id="btnDown">▼</div>
+      <div class="tbtn" id="btnRight">▶</div>
+    </div>
+    <div id="face">
+      <div class="tbtn ps triangle" id="btnJump">△</div>
+      <div class="tbtn ps circle" id="btnAction">◯</div>
+      <div class="tbtn ps cross" id="btnCross">✖</div>
+      <div class="tbtn ps square" id="btnSquare">▢</div>
+    </div>
+  </div>
+
+  <!-- Title screen -->
+  <div class="overlay" id="titleScreen">
+    <h1 class="pixel">CABINHA<br>E A TRILHA DO RESPEITO</h1>
+    <p>Ajude o Cabinha, um caboclo do sertão nordestino, a atravessar 4 fases coletando corações de respeito e enfrentando monstros de preconceito no caminho. Cada vitória é uma lição sobre igualdade!</p>
+    <button class="btn" id="btnStart">JOGAR</button>
+    <button class="btn secondary" id="btnHow">COMO JOGAR</button>
+  </div>
+
+  <!-- How to play -->
+  <div class="overlay hidden" id="howScreen">
+    <h2 class="pixel">COMO JOGAR</h2>
+    <p id="howText">PC: Setas ou A/D para mover, W ou ESPAÇO para pular, J para usar corações contra o chefão.<br><br>Celular: use os botões na tela.<br><br>Colete corações 💛 pelo caminho — você vai precisar deles pra enfraquecer os chefões!</p>
+    <button class="btn" id="btnHowBack">VOLTAR</button>
+  </div>
+
+  <!-- Stage intro -->
+  <div class="overlay hidden" id="stageIntro">
+    <h2 class="pixel" id="stageIntroTitle">FASE 1</h2>
+    <h1 id="stageIntroTheme">Homofobia</h1>
+    <p id="stageIntroText"></p>
+    <button class="btn" id="btnStageGo">COMEÇAR</button>
+  </div>
+
+  <!-- Boss defeated / lesson -->
+  <div class="overlay hidden" id="lessonScreen">
+    <div class="badge">MONSTRO DERROTADO!</div>
+    <h2 class="pixel" id="lessonTitle">A Máscara</h2>
+    <p id="lessonText"></p>
+    <button class="btn" id="btnLessonNext">CONTINUAR</button>
+  </div>
+
+  <!-- Game over -->
+  <div class="overlay hidden" id="gameOverScreen">
+    <h1 class="pixel">OPA!</h1>
+    <p>O Cabinha tropeçou. Vamos tentar de novo?</p>
+    <button class="btn" id="btnRetry">TENTAR NOVAMENTE</button>
+  </div>
+
+  <!-- Win screen -->
+  <div class="overlay hidden" id="winScreen">
+    <h1 class="pixel">PARABÉNS!</h1>
+    <p>O Cabinha venceu todos os monstros do preconceito! Lembre-se: respeitar as diferenças é o que torna o mundo mais forte e mais bonito. Cada pessoa merece ser tratada com igualdade, não importa quem ame, de onde venha, a cor da sua pele ou a sua idade.</p>
+    <button class="btn" id="btnPlayAgain">JOGAR DE NOVO</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============ CONFIG & DATA ============ */
+const W = 960, H = 540;
+const GRAVITY = 0.62;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// Pixel art sprites: coloque estes arquivos ao lado de cabinha.html
+const ASSETS = {
+  player: new Image(),
+  bosses: [
+    new Image(),
+    new Image(),
+    new Image(),
+    new Image()
+  ]
+};
+ASSETS.player.src = 'cabinha.png';
+ASSETS.bosses[0].src = 'boss-sussurro.png';
+ASSETS.bosses[1].src = 'boss-mascara.png';
+ASSETS.bosses[2].src = 'boss-relogio.png';
+ASSETS.bosses[3].src = 'boss-muro.png';
+
+function isSpriteReady(img){
+  return img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+}
+
+function drawSprite(img,x,y,w,h){
+  if(!isSpriteReady(img)) return false;
+  ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, x, y, w, h);
+  return true;
+}
+
+const STAGES = [
+  {
+    theme: "Homofobia",
+    intro: "Pelos campos, um sussurro de fofocas e risadinhas persegue quem é diferente. Ajude o Cabinha a atravessar e mostrar que amar não é motivo de vergonha.",
+    bossName: "O Sussurro",
+    bossTaunts: ["Isso não é normal!", "Vão rir de você!", "Esconda quem você é!"],
+    lesson: "Ninguém deveria se esconder por causa de quem ama. Respeitar a orientação sexual das pessoas é reconhecer que amor é amor, e que todo mundo merece viver sem medo de ser quem é.",
+    bg: "#7EC8E3", ground:"#4F7942", accent:"#9b7fd1"
+  },
+  {
+    theme: "Racismo",
+    intro: "Uma trilha de máscaras cobre o caminho, julgando as pessoas pela aparência antes mesmo de conhecê-las. Mostre que respeito não tem cor.",
+    bossName: "A Máscara",
+    bossTaunts: ["Você não é como nós!", "Julgado pela capa!", "Fique no seu lugar!"],
+    lesson: "A cor da pele nunca diz quem alguém é por dentro. Racismo machuca e limita pessoas injustamente. Respeitar significa enxergar cada um pelo seu caráter, não pela aparência.",
+    bg: "#e0b060", ground:"#6b4a2b", accent:"#555"
+  },
+  {
+    theme: "Etarismo",
+    intro: "Um relógio quebrado despreza quem é 'velho' ou 'novo' demais para valer a pena. Mostre que sabedoria e energia não têm idade certa.",
+    bossName: "O Relógio Quebrado",
+    bossTaunts: ["Você é velho demais!", "Muito novo pra entender!", "Sua idade não serve aqui!"],
+    lesson: "Idosos carregam experiência e sabedoria; jovens carregam energia e novas ideias. Ninguém vale menos por causa da idade. Respeitar é dar espaço e ouvir pessoas de todas as gerações.",
+    bg: "#f2c98a", ground:"#8a6d3b", accent:"#b0855a"
+  },
+  {
+    theme: "Xenofobia",
+    intro: "Um muro vivo bloqueia a entrada de quem vem de longe. Ajude o Cabinha a mostrar que ninguém é estrangeiro demais para ser bem-vindo.",
+    bossName: "O Muro",
+    bossTaunts: ["Você não é daqui!", "Volte pro seu lugar!", "Aqui não tem espaço pra você!"],
+    lesson: "Ninguém escolhe onde nasce. Pessoas que vêm de outros lugares merecem as mesmas boas-vindas e respeito que qualquer outra. Diversidade de culturas torna o mundo mais rico, não mais perigoso.",
+    bg: "#c9d6df", ground:"#5a6b70", accent:"#7a8f96"
+  }
+];
+
+// level layout generator (procedural-ish but fixed per stage for consistency)
+function buildLevel(stageIndex){
+  const groundY = H - 60;
+  const platforms = [];
+  const hearts = [];
+  const spikes = [];
+  // simple varied layout using stage index as seed offset
+  const seed = stageIndex*37;
+  let x = 300;
+  for(let i=0;i<9;i++){
+    const py = groundY - (60 + ((i*53+seed)%140));
+    const pw = 110 + ((i*29+seed)%80);
+    platforms.push({x:x, y:py, w:pw, h:20});
+    hearts.push({x:x+pw/2-10, y:py-34, w:20, h:20, taken:false});
+    if(i%3===1){
+      spikes.push({x:x+pw+30, y:groundY-24, w:26, h:24});
+    }
+    // extra heart floating in the gap after this platform, reachable at jump height
+    hearts.push({x:x+pw+90, y:groundY-70, w:20, h:20, taken:false});
+    x += pw + 140 + (i%2===0?40:0);
+  }
+  // a few extra hearts scattered near the start, so an early mistake isn't fatal to the run
+  hearts.push({x:120, y:groundY-60, w:20, h:20, taken:false});
+  hearts.push({x:200, y:groundY-60, w:20, h:20, taken:false});
+  const levelWidth = x + 700; // extra room for boss arena
+  // ground spans the whole level plus arena; unshifted so it renders under platforms
+  platforms.unshift({x:0,y:groundY,w:levelWidth+400,h:60});
+  const bossArenaX = levelWidth - 100;
+  return {platforms, hearts, spikes, levelWidth, bossArenaX, groundY};
+}
+
+/* ============ INPUT ============ */
+const keys = { left:false, right:false, jump:false, action:false };
+window.addEventListener('keydown', e=>{
+  if(['ArrowLeft','a','A'].includes(e.key)) keys.left = true;
+  if(['ArrowRight','d','D'].includes(e.key)) keys.right = true;
+  if(['ArrowUp','w','W',' '].includes(e.key)){ keys.jump = true; e.preventDefault(); }
+  if(['j','J'].includes(e.key)) keys.action = true;
+});
+window.addEventListener('keyup', e=>{
+  if(['ArrowLeft','a','A'].includes(e.key)) keys.left = false;
+  if(['ArrowRight','d','D'].includes(e.key)) keys.right = false;
+  if(['ArrowUp','w','W',' '].includes(e.key)) keys.jump = false;
+  if(['j','J'].includes(e.key)) keys.action = false;
+});
+
+function bindTouch(id, prop){
+  const el = document.getElementById(id);
+  const on = (e)=>{ keys[prop]=true; e.preventDefault(); };
+  const off = (e)=>{ keys[prop]=false; e.preventDefault(); };
+  el.addEventListener('touchstart', on, {passive:false});
+  el.addEventListener('touchend', off, {passive:false});
+  el.addEventListener('touchcancel', off, {passive:false});
+  el.addEventListener('mousedown', on);
+  el.addEventListener('mouseup', off);
+  el.addEventListener('mouseleave', off);
+}
+bindTouch('btnLeft','left');
+bindTouch('btnRight','right');
+bindTouch('btnUp','jump');
+bindTouch('btnJump','jump');
+bindTouch('btnAction','action');
+
+if('ontouchstart' in window){
+  document.getElementById('touchControls').classList.add('active');
+}
+
+/* ============ STATE ============ */
+let state = 'title'; // title, how, stageIntro, playing, boss, lesson, gameover, win
+let currentStage = 0;
+let level = null;
+let camX = 0;
+let hearts = 0;
+let player, bossState;
+
+function resetPlayer(){
+  player = { x:60, y:0, w:34, h:44, vx:0, vy:0, onGround:false, facing:1, hurtTimer:0, dead:false };
+}
+
+function startStage(i){
+  currentStage = i;
+  level = buildLevel(i);
+  resetPlayer();
+  camX = 0;
+  document.getElementById('stageNum').textContent = (i+1);
+  document.getElementById('bossBarWrap').style.display = 'none';
+  const s = STAGES[i];
+  document.getElementById('stageIntroTitle').textContent = 'FASE ' + (i+1);
+  document.getElementById('stageIntroTheme').textContent = s.theme;
+  document.getElementById('stageIntroText').textContent = s.intro;
+  show('stageIntro');
+  state = 'stageIntro';
+}
+
+function beginPlaying(){
+  hide('stageIntro');
+  state = 'playing';
+  bossState = null;
+}
+
+function startBoss(){
+  const s = STAGES[currentStage];
+  bossState = {
+    hp: 90, maxHp:90,
+    x: level.bossArenaX - 220, y: level.groundY - 90, w:90, h:90,
+    dir:-1, vy:0,
+    projectiles: [],
+    tauntTimer: 60, tauntIndex:0, currentTaunt:null, taunted:false,
+    hitFlash:0, actionCooldown:0
+  };
+  document.getElementById('bossBarWrap').style.display='block';
+  document.getElementById('bossBarInner').style.width = '100%';
+  document.getElementById('bossName').textContent = s.bossName.toUpperCase();
+  state = 'boss';
+}
+
+function loseHeart(){
+  player.hurtTimer = 60;
+  if(hearts > 0){
+    hearts--; updateHeartHud();
+  }
+}
+
+function playerDies(){
+  state = 'gameover';
+  show('gameOverScreen');
+}
+
+/* ============ UPDATE ============ */
+function update(){
+  if(state==='playing') updatePlaying();
+  else if(state==='boss') updateBoss();
+}
+
+function updatePlaying(){
+  physicsPlayer();
+
+  // camera follow, clamp to boss arena start so boss appears fixed-screen
+  camX = Math.max(0, Math.min(player.x - W*0.4, level.bossArenaX - W + 80));
+
+  // collect hearts
+  level.hearts.forEach(h=>{
+    if(!h.taken && rectsOverlap(player,h)){
+      h.taken = true; hearts++; updateHeartHud();
+    }
+  });
+
+  // spikes
+  level.spikes.forEach(sp=>{
+    if(rectsOverlap(player,sp) && player.hurtTimer<=0){
+      loseHeart();
+      player.vy = -9; player.vx = (player.x < sp.x)? -6:6;
+    }
+  });
+
+  if(player.hurtTimer>0) player.hurtTimer--;
+  if(player.y > H+200) playerDies();
+
+  // reach boss arena
+  if(player.x > level.bossArenaX){
+    player.x = level.bossArenaX;
+    startBoss();
+  }
+}
+
+function physicsPlayer(){
+  const speed = 4.6;
+  if(keys.left){ player.vx = -speed; player.facing=-1; }
+  else if(keys.right){ player.vx = speed; player.facing=1; }
+  else player.vx *= 0.7;
+
+  if(keys.jump && player.onGround){ player.vy = -13.5; player.onGround=false; }
+
+  player.vy += GRAVITY;
+  if(player.vy>16) player.vy=16;
+
+  player.x += player.vx;
+  player.y += player.vy;
+  if(player.x<0) player.x=0;
+
+  player.onGround=false;
+  for(const p of level.platforms){
+    if(player.x+player.w>p.x && player.x<p.x+p.w){
+      if(player.vy>=0 && player.y+player.h>=p.y && player.y+player.h-player.vy<=p.y+2){
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.onGround = true;
+      }
+    }
+  }
+}
+
+function updateBoss(){
+  const speed = 4.2;
+  if(keys.left){ player.vx=-speed; player.facing=-1; }
+  else if(keys.right){ player.vx=speed; player.facing=1; }
+  else player.vx*=0.7;
+  if(keys.jump && player.onGround){ player.vy=-13; player.onGround=false; }
+  player.vy += GRAVITY; if(player.vy>16) player.vy=16;
+
+  // constrain player within arena screen
+  const arenaLeft = level.bossArenaX - W + 160;
+  const arenaRight = level.bossArenaX - 180;
+  player.x += player.vx; player.y += player.vy;
+  if(player.x < arenaLeft) player.x = arenaLeft;
+  if(player.x > arenaRight) player.x = arenaRight;
+
+  player.onGround=false;
+  for(const p of level.platforms){
+    if(player.x+player.w>p.x && player.x<p.x+p.w){
+      if(player.vy>=0 && player.y+player.h>=p.y && player.y+player.h-player.vy<=p.y+2){
+        player.y=p.y-player.h; player.vy=0; player.onGround=true;
+      }
+    }
+  }
+  camX = Math.max(0, Math.min(level.bossArenaX - W + 80, level.bossArenaX - W + 80));
+
+  const b = bossState;
+  const s = STAGES[currentStage];
+
+  // boss floats side to side (kept within the visible arena screen)
+  b.x += b.dir*1.3;
+  if(b.x > level.bossArenaX-120){ b.dir=-1; }
+  if(b.x < level.bossArenaX-260){ b.dir=1; }
+
+  // taunt cycle -> spawns projectile bubble
+  b.tauntTimer--;
+  if(b.tauntTimer<=0){
+    b.tauntTimer = 110;
+    b.currentTaunt = s.bossTaunts[b.tauntIndex % s.bossTaunts.length];
+    b.tauntIndex++;
+    b.projectiles.push({x:b.x+b.w/2, y:b.y+20, vx:(player.x<b.x?-3.4:3.4), vy:-2, life:140, text:b.currentTaunt});
+  }
+
+  b.projectiles.forEach(pr=>{
+    pr.vy += 0.12;
+    pr.x += pr.vx; pr.y += pr.vy;
+    pr.life--;
+    if(rectsOverlap(player,{x:pr.x-14,y:pr.y-14,w:28,h:28}) && player.hurtTimer<=0){
+      loseHeart();
+      pr.life=0;
+    }
+  });
+  b.projectiles = b.projectiles.filter(pr=>pr.life>0 && pr.y<H+50);
+
+  if(player.hurtTimer>0) player.hurtTimer--;
+  if(b.hitFlash>0) b.hitFlash--;
+  if(b.actionCooldown>0) b.actionCooldown--;
+
+  // action: throw heart of respect at boss
+  if(keys.action && hearts>0 && b.actionCooldown<=0){
+    b.actionCooldown = 22;
+    hearts--; updateHeartHud();
+    const dmg = 10;
+    b.hp -= dmg;
+    b.hitFlash = 10;
+    if(b.hp<=0){
+      b.hp=0;
+      onBossDefeated();
+    }
+    document.getElementById('bossBarInner').style.width = Math.max(0,(b.hp/b.maxHp*100))+'%';
+  }
+
+  if(player.y>H+200) playerDies();
+}
+
+function onBossDefeated(){
+  const s = STAGES[currentStage];
+  document.getElementById('lessonTitle').textContent = s.bossName;
+  document.getElementById('lessonText').textContent = s.lesson;
+  show('lessonScreen');
+  state='lesson';
+}
+
+function updateHeartHud(){ document.getElementById('heartCount').textContent = hearts; }
+
+function rectsOverlap(a,b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+/* ============ RENDER ============ */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const s = STAGES[currentStage] || STAGES[0];
+
+  // sky
+  ctx.fillStyle = s.bg;
+  ctx.fillRect(0,0,W,H);
+  drawBackgroundScenery();
+  // sun / decorative
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  for(let i=0;i<4;i++){
+    ctx.beginPath();
+    ctx.ellipse(120+i*220 - (camX*0.2)%1000, 90+((i%2)*30), 46,20,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.translate(-camX,0);
+
+  if(level){
+    // platforms
+    level.platforms.forEach(p=>{
+      ctx.fillStyle = s.ground;
+      ctx.fillRect(p.x,p.y,p.w,p.h);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(p.x,p.y,p.w,4);
+    });
+    // spikes
+    level.spikes.forEach(sp=>{
+      ctx.fillStyle = STAGES[currentStage].accent;
+      ctx.beginPath();
+      ctx.moveTo(sp.x,sp.y+sp.h);
+      ctx.lineTo(sp.x+sp.w/2,sp.y);
+      ctx.lineTo(sp.x+sp.w,sp.y+sp.h);
+      ctx.fill();
+    });
+    // hearts
+    level.hearts.forEach(h=>{
+      if(!h.taken) drawHeart(h.x+10,h.y+10,12);
+    });
+
+    if(state==='boss' || (state==='lesson')){
+      drawBossArenaDeco();
+    }
+  }
+
+  if(player) drawCabinha(player.x,player.y,player.facing,player.hurtTimer>0);
+
+  if(bossState){
+    drawBoss(bossState);
+    bossState.projectiles.forEach(pr=>{
+      drawTauntBubble(pr.x,pr.y,pr.text);
+    });
+  }
+
+  ctx.restore();
+}
+
+function drawHeart(cx,cy,size){
+  ctx.fillStyle = '#E8B84B';
+  ctx.strokeStyle = '#3D2411';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  const s=size;
+  ctx.moveTo(cx,cy+s*0.3);
+  ctx.bezierCurveTo(cx,cy,cx-s,cy,cx-s,cy+s*0.3);
+  ctx.bezierCurveTo(cx-s,cy+s*0.7,cx,cy+s,cx,cy+s*1.2);
+  ctx.bezierCurveTo(cx,cy+s,cx+s,cy+s*0.7,cx+s,cy+s*0.3);
+  ctx.bezierCurveTo(cx+s,cy,cx,cy,cx,cy+s*0.3);
+  ctx.fill(); ctx.stroke();
+}
+
+function drawBackgroundScenery(){
+  const base = H - 60;
+  const offset = (camX * 0.12) % 480;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath();
+  ctx.moveTo(0, base - 22);
+  ctx.quadraticCurveTo(180 - offset, base - 60, 360 - offset, base - 22);
+  ctx.quadraticCurveTo(520 - offset, base - 10, 760 - offset, base - 30);
+  ctx.quadraticCurveTo(900 - offset, base - 45, W, base - 22);
+  ctx.lineTo(W, H);
+  ctx.lineTo(0,H);
+  ctx.closePath();
+  ctx.fill();
+  drawCactus(100 - offset, base - 44, 1.1);
+  drawCactus(430 - offset, base - 38, 0.9);
+  drawCactus(720 - offset, base - 50, 1.2);
+}
+
+function drawCactus(x,y,scale){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#4F7942';
+  ctx.fillRect(-6,0,12,48);
+  ctx.fillRect(-16,12,12,26);
+  ctx.fillRect(4,14,12,24);
+  ctx.fillStyle = '#3D2411';
+  ctx.fillRect(-8,8,4,6);
+  ctx.fillRect(10,10,4,6);
+  ctx.restore();
+}
+
+function drawCabinha(x,y,facing,hurt){
+  const spriteWidth = player.w * 2;
+  const spriteHeight = player.h * 2;
+  const spriteX = x + player.w/2 - spriteWidth/2;
+  const spriteY = y - (spriteHeight - player.h);
+
+  if(drawSprite(ASSETS.player, spriteX, spriteY, spriteWidth, spriteHeight)){
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(x+player.w/2, y);
+  ctx.scale(facing,1);
+  if(hurt && Math.floor(Date.now()/80)%2===0){ ctx.globalAlpha=0.4; }
+
+  // boots
+  ctx.fillStyle = '#4d2c18';
+  ctx.fillRect(-18,34,14,10);
+  ctx.fillRect(4,34,14,10);
+  ctx.fillRect(-18,30,4,4);
+  ctx.fillRect(14,30,4,4);
+
+  // pants
+  ctx.fillStyle = '#7a4a22';
+  ctx.fillRect(-16,18,32,14);
+  ctx.fillRect(-14,16,12,2);
+  ctx.fillRect(2,16,12,2);
+
+  // poncho
+  ctx.fillStyle = '#b86c2b';
+  ctx.fillRect(-18,4,36,26);
+  ctx.fillStyle = '#f4e4c1';
+  ctx.fillRect(-18,16,36,4);
+  ctx.fillRect(-18,10,4,4);
+  ctx.fillRect(14,10,4,4);
+
+  // belt
+  ctx.fillStyle = '#335d7b';
+  ctx.fillRect(-16,14,32,4);
+  ctx.fillStyle = '#87b6d6';
+  ctx.fillRect(-4,14,8,4);
+  ctx.fillStyle = '#3d2411';
+  ctx.fillRect(-16,14,2,4);
+  ctx.fillRect(14,14,2,4);
+
+  // jacket collar
+  ctx.fillStyle = '#6e441f';
+  ctx.fillRect(-18,8,36,6);
+  ctx.fillRect(-12,4,6,10);
+  ctx.fillRect(6,4,6,10);
+
+  // satchel
+  ctx.fillStyle = '#3f7d4f';
+  ctx.fillRect(14,10,10,12);
+  ctx.fillStyle = '#284f34';
+  ctx.fillRect(14,16,10,4);
+
+  // arms
+  ctx.fillStyle = '#b67641';
+  ctx.fillRect(-22,10,8,18);
+  ctx.fillRect(14,10,8,18);
+
+  // hands
+  ctx.fillStyle = '#f0b27a';
+  ctx.fillRect(-22,24,8,4);
+  ctx.fillRect(14,24,8,4);
+
+  // head
+  ctx.fillStyle = '#f3c195';
+  ctx.fillRect(-12,-10,24,18);
+  ctx.fillStyle = '#d9986c';
+  ctx.fillRect(-12,2,24,4);
+
+  // nose
+  ctx.fillStyle = '#2c1b0f';
+  ctx.fillRect(-2,-2,4,6);
+
+  // moustache
+  ctx.fillRect(-8,2,6,2);
+  ctx.fillRect(2,2,6,2);
+
+  // hat brim
+  ctx.fillStyle = '#8b5a2b';
+  ctx.fillRect(-22,-18,44,8);
+  ctx.fillRect(-20,-24,40,6);
+  ctx.fillRect(-18,-28,36,4);
+
+  // hat top
+  ctx.fillStyle = '#6b3f1d';
+  ctx.fillRect(-16,-30,32,10);
+  ctx.fillRect(-10,-38,20,8);
+
+  // rope detail
+  ctx.strokeStyle = '#d8b07a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-10,-26);
+  ctx.lineTo(0,-32);
+  ctx.lineTo(10,-26);
+  ctx.stroke();
+
+  // face details
+  ctx.fillStyle = '#2c1b0f';
+  ctx.fillRect(-6,0,4,4);
+  ctx.fillRect(2,0,4,4);
+  ctx.fillRect(-3,6,6,2);
+  ctx.fillRect(-2,7,2,2);
+  ctx.fillRect(2,7,2,2);
+
+  // blush
+  ctx.fillStyle = '#e8a98b';
+  ctx.fillRect(-8,2,3,2);
+  ctx.fillRect(5,2,3,2);
+
+  ctx.restore();
+  ctx.globalAlpha=1;
+}
+
+function drawBossArenaDeco(){
+  const bx = level.bossArenaX;
+  ctx.fillStyle='rgba(61,36,17,0.15)';
+  ctx.fillRect(bx-10,0,20,H);
+}
+
+function drawBoss(b){
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  if(b.hitFlash>0) ctx.globalAlpha=0.5;
+
+  if(!drawSprite(ASSETS.bosses[currentStage], 0, 0, b.w, b.h)){
+    const s = STAGES[currentStage];
+    switch(currentStage){
+      case 0: drawSussurro(b); break;
+      case 1: drawMascara(b); break;
+      case 2: drawRelogio(b); break;
+      case 3: drawMuro(b); break;
+      default: drawDefaultBoss(b,s); break;
+    }
+  }
+
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+function drawSussurro(b){
+  ctx.fillStyle = 'rgba(155,127,209,0.95)';
+  ctx.beginPath();
+  ctx.ellipse(b.w*0.5,b.h*0.45,b.w*0.55,b.h*0.55,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(124,76,163,0.95)';
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.1,b.h*0.5);
+  ctx.quadraticCurveTo(b.w*0.3,b.h*0.15,b.w*0.5,b.h*0.4);
+  ctx.quadraticCurveTo(b.w*0.7,b.h*0.1,b.w*0.9,b.h*0.45);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(b.w*0.22,b.h*0.35,12,8);
+  ctx.fillRect(b.w*0.62,b.h*0.35,12,8);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(b.w*0.24,b.h*0.37,6,6);
+  ctx.fillRect(b.w*0.64,b.h*0.37,6,6);
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.36,b.h*0.68);
+  ctx.lineTo(b.w*0.64,b.h*0.68);
+  ctx.stroke();
+  ctx.fillStyle='#3D2411';
+  ctx.fillRect(b.w*0.46,b.h*0.18,8,18);
+}
+
+function drawMascara(b){
+  ctx.fillStyle = 'rgba(85,85,85,0.95)';
+  ctx.fillRect(0,0,b.w,b.h*0.9);
+  ctx.fillStyle = 'rgba(64,61,87,0.95)';
+  ctx.fillRect(6,6,b.w-12,b.h*0.9-12);
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=3;
+  ctx.strokeRect(0,0,b.w,b.h*0.9);
+  ctx.fillStyle='#fff';
+  ctx.fillRect(b.w*0.18,b.h*0.24,12,12);
+  ctx.fillRect(b.w*0.62,b.h*0.24,12,12);
+  ctx.fillStyle='#000';
+  ctx.fillRect(b.w*0.2,b.h*0.26,6,6);
+  ctx.fillRect(b.w*0.64,b.h*0.26,6,6);
+  ctx.strokeStyle='#000'; ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.28,b.h*0.62);
+  ctx.lineTo(b.w*0.72,b.h*0.62);
+  ctx.stroke();
+  ctx.strokeStyle='#C5A96B'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.52,b.h*0.1);
+  ctx.lineTo(b.w*0.78,b.h*0.34);
+  ctx.moveTo(b.w*0.5,b.h*0.12);
+  ctx.lineTo(b.w*0.74,b.h*0.36);
+  ctx.stroke();
+}
+
+function drawRelogio(b){
+  ctx.fillStyle = 'rgba(180,146,98,0.95)';
+  ctx.beginPath();
+  ctx.arc(b.w*0.5,b.h*0.5,b.w*0.45,0,Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=4;
+  ctx.stroke();
+  ctx.fillStyle='#fff';
+  ctx.fillRect(b.w*0.42,b.h*0.08,10,24);
+  ctx.fillRect(b.w*0.5,b.h*0.5,28,8);
+  ctx.fillStyle='#3D2411';
+  ctx.fillRect(b.w*0.44,b.h*0.12,6,14);
+  ctx.fillRect(b.w*0.5,b.h*0.52,20,4);
+  ctx.fillStyle='#2c1b0f';
+  ctx.fillRect(b.w*0.22,b.h*0.32,12,12);
+  ctx.fillRect(b.w*0.68,b.h*0.32,12,12);
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.35,b.h*0.72);
+  ctx.lineTo(b.w*0.65,b.h*0.72);
+  ctx.strokeStyle='#000'; ctx.lineWidth=4;
+  ctx.stroke();
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.14,b.h*0.12);
+  ctx.lineTo(b.w*0.86,b.h*0.88);
+  ctx.stroke();
+}
+
+function drawMuro(b){
+  ctx.fillStyle = 'rgba(96,83,70,0.95)';
+  ctx.fillRect(0,0,b.w,b.h*0.9);
+  ctx.fillStyle = 'rgba(128,93,64,0.95)';
+  for(let row=0;row<4;row++){
+    for(let col=0;col<3;col++){
+      ctx.fillRect(6+col*28, 6+row*18, 24, 12);
+    }
+  }
+  ctx.fillStyle='#3D2411';
+  ctx.fillRect(b.w*0.18,b.h*0.28,12,12);
+  ctx.fillRect(b.w*0.62,b.h*0.28,12,12);
+  ctx.fillStyle='#000';
+  ctx.fillRect(b.w*0.2,b.h*0.3,6,6);
+  ctx.fillRect(b.w*0.64,b.h*0.3,6,6);
+  ctx.strokeStyle='#000'; ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(b.w*0.3,b.h*0.64);
+  ctx.lineTo(b.w*0.7,b.h*0.64);
+  ctx.stroke();
+  ctx.fillStyle='rgba(148,89,56,0.98)';
+  ctx.fillRect(0,-8,b.w,8);
+  ctx.fillStyle='#3D2411';
+  ctx.fillRect(4,-8,10,8);
+  ctx.fillRect(b.w-14,-8,10,8);
+}
+
+function drawDefaultBoss(b,s){
+  ctx.fillStyle = s.accent;
+  ctx.beginPath();
+  ctx.ellipse(b.w/2,b.h/2,b.w/2,b.h/2,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=3; ctx.stroke();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.ellipse(b.w*0.32,b.h*0.4,10,7,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(b.w*0.68,b.h*0.4,10,7,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.ellipse(b.w*0.32,b.h*0.4,4,4,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(b.w*0.68,b.h*0.4,4,4,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#000'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(b.w*0.25,b.h*0.65); ctx.lineTo(b.w*0.75,b.h*0.65); ctx.stroke();
+}
+
+function drawTauntBubble(x,y,text){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.fillStyle='rgba(166,58,45,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(0,0,60,22,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle='#3D2411'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#fff';
+  ctx.font='11px Nunito, sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, 0, 1);
+  ctx.restore();
+}
+
+/* ============ LOOP ============ */
+function loop(){
+  update();
+  render();
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ============ UI WIRING ============ */
+function show(id){ document.getElementById(id).classList.remove('hidden'); }
+function hide(id){ document.getElementById(id).classList.add('hidden'); }
+
+document.getElementById('btnStart').onclick = ()=>{
+  hide('titleScreen');
+  hearts=0; updateHeartHud();
+  startStage(0);
+};
+document.getElementById('btnHow').onclick = ()=>{ hide('titleScreen'); show('howScreen'); };
+document.getElementById('btnHowBack').onclick = ()=>{ hide('howScreen'); show('titleScreen'); };
+document.getElementById('btnStageGo').onclick = ()=>{ beginPlaying(); };
+document.getElementById('btnLessonNext').onclick = ()=>{
+  hide('lessonScreen');
+  if(currentStage+1 < STAGES.length){
+    startStage(currentStage+1);
+  } else {
+    show('winScreen');
+    state='win';
+  }
+};
+document.getElementById('btnRetry').onclick = ()=>{
+  hide('gameOverScreen');
+  hearts = 0; updateHeartHud();
+  startStage(currentStage);
+};
+document.getElementById('btnPlayAgain').onclick = ()=>{
+  hide('winScreen');
+  hearts=0; updateHeartHud();
+  show('titleScreen');
+  state='title';
+};
+
+/* Responsive canvas scaling (CSS handles max size, keep crisp) */
+function fitCanvas(){
+  const scale = Math.min(window.innerWidth/W, window.innerHeight/H);
+  canvas.style.width = (W*scale)+'px';
+  canvas.style.height = (H*scale)+'px';
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+
+})();
+</script>
+</body>
+</html>
