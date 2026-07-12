@@ -186,6 +186,32 @@ const GRAVITY = 0.62;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Pixel art sprites: coloque estes arquivos ao lado de cabinha.html
+const ASSETS = {
+  player: new Image(),
+  bosses: [
+    new Image(),
+    new Image(),
+    new Image(),
+    new Image()
+  ]
+};
+ASSETS.player.src = 'cabinha.png';
+ASSETS.bosses[0].src = 'boss-sussurro.png';
+ASSETS.bosses[1].src = 'boss-mascara.png';
+ASSETS.bosses[2].src = 'boss-relogio.png';
+ASSETS.bosses[3].src = 'boss-muro.png';
+
+function isSpriteReady(img){
+  return img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+}
+
+function drawSprite(img,x,y,w,h){
+  if(!isSpriteReady(img)) return false;
+  ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, x, y, w, h);
+  return true;
+}
+
 const STAGES = [
   {
     theme: "Homofobia",
@@ -606,6 +632,15 @@ function drawCactus(x,y,scale){
 }
 
 function drawCabinha(x,y,facing,hurt){
+  const spriteWidth = player.w * 2;
+  const spriteHeight = player.h * 2;
+  const spriteX = x + player.w/2 - spriteWidth/2;
+  const spriteY = y - (spriteHeight - player.h);
+
+  if(drawSprite(ASSETS.player, spriteX, spriteY, spriteWidth, spriteHeight)){
+    return;
+  }
+
   ctx.save();
   ctx.translate(x+player.w/2, y);
   ctx.scale(facing,1);
@@ -724,14 +759,16 @@ function drawBoss(b){
   ctx.save();
   ctx.translate(b.x, b.y);
   if(b.hitFlash>0) ctx.globalAlpha=0.5;
-  const s = STAGES[currentStage];
 
-  switch(currentStage){
-    case 0: drawSussurro(b); break;
-    case 1: drawMascara(b); break;
-    case 2: drawRelogio(b); break;
-    case 3: drawMuro(b); break;
-    default: drawDefaultBoss(b,s); break;
+  if(!drawSprite(ASSETS.bosses[currentStage], 0, 0, b.w, b.h)){
+    const s = STAGES[currentStage];
+    switch(currentStage){
+      case 0: drawSussurro(b); break;
+      case 1: drawMascara(b); break;
+      case 2: drawRelogio(b); break;
+      case 3: drawMuro(b); break;
+      default: drawDefaultBoss(b,s); break;
+    }
   }
 
   ctx.globalAlpha=1;
