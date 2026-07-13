@@ -167,6 +167,18 @@
     <button class="btn" id="btnHowBack">VOLTAR</button>
   </div>
 
+  <!-- Quiz prerequisite overlay -->
+  <div class="overlay hidden" id="quizOverlay">
+    <h2 class="pixel">QUIZ DO CABINHA</h2>
+    <div id="quiz" style="max-width:420px; width:100%;"></div>
+    <div id="result" style="margin-top:8px;color:var(--cream);"></div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn" id="quizRestart" style="display:none;">Refazer</button>
+      <button class="btn" id="startGameBtn" style="display:none;">Jogar</button>
+      <button class="btn secondary" id="quizClose">Voltar</button>
+    </div>
+  </div>
+
   <!-- Stage intro -->
   <div class="overlay hidden" id="stageIntro">
     <h2 class="pixel" id="stageIntroTitle">FASE 1</h2>
@@ -950,9 +962,10 @@ function show(id){ document.getElementById(id).classList.remove('hidden'); }
 function hide(id){ document.getElementById(id).classList.add('hidden'); }
 
 document.getElementById('btnStart').onclick = ()=>{
+  // abrir o quiz antes de iniciar o jogo
   hide('titleScreen');
-  hearts=0; updateHeartHud();
-  startStage(0);
+  show('quizOverlay');
+  window.quizReset && window.quizReset();
 };
 document.getElementById('btnHow').onclick = ()=>{ hide('titleScreen'); show('howScreen'); };
 document.getElementById('btnHowBack').onclick = ()=>{ hide('howScreen'); show('titleScreen'); };
@@ -986,6 +999,75 @@ function fitCanvas(){
 }
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
+
+// Quiz logic (pré-requisito para jogar)
+(function(){
+  const quizData = [
+    { question: "Quem criou o Cabinha?", options: ["Seus avós","Seus pais","Ele mesmo"], answer: "Seus pais" },
+    { question: "Qual é a missão do Cabinha?", options: ["Vingar sua família","Ficar rico","Combater o preconceito"], answer: "Combater o preconceito" },
+    { question: "Qual poder representa empatia?", options: ["Rede de descanso","Cantil de água","Chapéu de couro"], answer: "Cantil de água" },
+    { question: "Qual destes Cabinha combate?", options: ["Respeito","Racismo","Alegria"], answer: "Racismo" },
+    { question: "O que a rede simboliza para o Cabinha?", options: ["Ataque","Sono profundo","Equilíbrio e paz"], answer: "Equilíbrio e paz" }
+  ];
+
+  let qIndex = 0, qScore = 0;
+  const quizEl = document.getElementById('quiz');
+  const resultEl = document.getElementById('result');
+  const startGameBtn = document.getElementById('startGameBtn');
+  const quizRestart = document.getElementById('quizRestart');
+  const quizClose = document.getElementById('quizClose');
+
+  function shuffle(arr){
+    for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+    return arr;
+  }
+
+  function loadQuestion(){
+    const q = quizData[qIndex];
+    const opts = shuffle([...q.options]);
+    resultEl.textContent = '';
+    quizEl.innerHTML = `<h3 style="color:var(--cream);">${q.question}</h3>` +
+      opts.map(o=>`<button class="btn" style="margin:6px;" onclick="window.__checkQuiz && window.__checkQuiz('${o.replace(/'/g,"\\'")}')">${o}</button>`).join('');
+  }
+
+  window.__checkQuiz = function(selected){
+    const correct = quizData[qIndex].answer;
+    const buttons = Array.from(quizEl.querySelectorAll('button'));
+    buttons.forEach(b=>b.disabled=true);
+    if(selected===correct){ qScore++; }
+    buttons.forEach(b=>{
+      if(b.textContent===correct) b.style.border='3px solid #3cf6a1';
+      if(b.textContent===selected && selected!==correct) b.style.border='3px solid #ff6b6b';
+    });
+    setTimeout(()=>{
+      qIndex++;
+      if(qIndex<quizData.length) loadQuestion();
+      else showResult();
+    },700);
+  };
+
+  function showResult(){
+    quizEl.innerHTML = '';
+    resultEl.innerHTML = `Você acertou ${qScore} de ${quizData.length}` + (qScore<4?"<br><span style='color:#ff6b6b;'>Você precisa de pelo menos 4 acertos.</span>":"");
+    if(qScore>=4){ startGameBtn.style.display='inline-block'; quizRestart.style.display='inline-block'; }
+    else { startGameBtn.style.display='none'; quizRestart.style.display='inline-block'; }
+  }
+
+  function quizReset(){
+    qIndex=0; qScore=0; startGameBtn.style.display='none'; quizRestart.style.display='none'; resultEl.textContent=''; loadQuestion();
+  }
+
+  quizRestart.onclick = quizReset;
+  quizClose.onclick = ()=>{ hide('quizOverlay'); show('titleScreen'); };
+  startGameBtn.onclick = ()=>{
+    hide('quizOverlay');
+    hearts=0; updateHeartHud();
+    startStage(0); beginPlaying();
+  };
+
+  // expose reset to outer scope
+  window.quizReset = quizReset;
+})();
 
 })();
 </script>
