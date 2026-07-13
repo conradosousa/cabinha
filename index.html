@@ -163,7 +163,7 @@
   <!-- How to play -->
   <div class="overlay hidden" id="howScreen">
     <h2 class="pixel">COMO JOGAR</h2>
-    <p id="howText">PC: Setas ou A/D para mover, W ou ESPAÇO para pular, J para usar corações contra o chefão.<br><br>Celular: use os botões na tela.<br><br>Colete corações 💛 pelo caminho — você vai precisar deles pra enfraquecer os chefões!</p>
+    <p id="howText">Carregando instruções...</p>
     <button class="btn" id="btnHowBack">VOLTAR</button>
   </div>
 
@@ -344,9 +344,19 @@ bindTouch('btnUp','jump');
 bindTouch('btnJump','jump');
 bindTouch('btnAction','action');
 
-if('ontouchstart' in window){
+const isTouchDevice = 'ontouchstart' in window;
+if(isTouchDevice){
   document.getElementById('touchControls').classList.add('active');
 }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const howText = document.getElementById('howText');
+  if(howText){
+    howText.innerHTML = isTouchDevice
+      ? `Celular: use os botões na tela para andar, pular e agir.<br><br>Colete corações 💛 pelo caminho para enfraquecer o chefão!`
+      : `PC: use ←/→ ou A/D para andar, W ou ESPAÇO para pular e J para usar corações contra o chefão.<br><br>Colete corações 💛 pelo caminho para enfraquecer o chefão!`;
+  }
+});
 
 /* ============ STATE ============ */
 let state = 'title'; // title, how, stageIntro, playing, boss, lesson, gameover, win
